@@ -26,12 +26,12 @@ class GraphModel {
 
     private suspend fun getAllNodes(id: Long) {
         val apiPet = loadPetForGraph(id)
-        val children: List<Long> = apiPet.children!!
-        val parents = apiPet.parents!!
+        val children: List<Long> = apiPet.children
+        val parents = apiPet.parents
         addChildrenNodes(children)
         addParentsNodes(parents)
         nodes.forEach {
-            Log.d(LOG_TAG,"GraphModel - getAllNodes node: " + (it.value.node?.data as ApiPet).name)
+            Log.d(LOG_TAG,"GraphModel - getAllNodes node: " + (it.value.node.data as ApiPet).name)
         }
     }
 
@@ -44,8 +44,8 @@ class GraphModel {
                     nodes[it] = MyNode(
                         node = Node(apiPetChild)
                     )
-                    addChildrenNodes(apiPetChild.children!!)
-                    addParentsNodes(apiPetChild.parents!!)
+                    addChildrenNodes(apiPetChild.children)
+                    addParentsNodes(apiPetChild.parents)
                 }
             }
         }
@@ -60,8 +60,8 @@ class GraphModel {
                     nodes[it] = MyNode(
                         node = Node(apiPetParent)
                     )
-                    addParentsNodes(apiPetParent.parents!!)
-                    addChildrenNodes(apiPetParent.children!!)
+                    addParentsNodes(apiPetParent.parents)
+                    addChildrenNodes(apiPetParent.children)
                 }
             }
         }
@@ -81,16 +81,14 @@ class GraphModel {
     private fun edgesChildren() {
         nodes.forEach {
             it.value.isVisitedChildren = true
-            val children = (it.value.node?.data as ApiPet).children
-            if (children != null) {
-                if (children.isNotEmpty()) {
-                    children.forEach { id ->
-                        val edge = Edge(it.value.node, nodes[id]?.node!!)
-                        val keyEdges = "" + it.value.node.hashCode() + nodes[id]?.node.hashCode()
-                        if (edges[keyEdges] == null){
-                            edges[keyEdges] = edge
-                            myGraph.addEdge(edge)
-                        }
+            val children = (it.value.node.data as ApiPet).children
+            if (children.isNotEmpty()) {
+                children.forEach { id ->
+                    val edge = Edge(it.value.node, nodes[id]?.node!!)
+                    val keyEdges = "" + it.value.node.hashCode() + nodes[id]?.node.hashCode()
+                    if (edges[keyEdges] == null){
+                        edges[keyEdges] = edge
+                        myGraph.addEdge(edge)
                     }
                 }
             }
@@ -100,18 +98,16 @@ class GraphModel {
     private fun edgesParents() {
         nodes.forEach {
             it.value.isVisitedParent = true
-            val parents = (it.value.node?.data as ApiPet).parents
-            if (parents != null) {
-                if (parents.isNotEmpty()) {
-                    parents.forEach {id ->
-                        val edge = Edge(nodes[id]?.node!!, it.value.node)
-                        val keyEdges = "" + nodes[id]?.node.hashCode() + it.value.node.hashCode()
-                        if (edges[keyEdges] == null){
-                            edges[keyEdges] = edge
-                            myGraph.addEdge(edge)
-                        }
-
+            val parents = (it.value.node.data as ApiPet).parents
+            if (parents.isNotEmpty()) {
+                parents.forEach {id ->
+                    val edge = Edge(nodes[id]?.node!!, it.value.node)
+                    val keyEdges = "" + nodes[id]?.node.hashCode() + it.value.node.hashCode()
+                    if (edges[keyEdges] == null){
+                        edges[keyEdges] = edge
+                        myGraph.addEdge(edge)
                     }
+
                 }
             }
         }
@@ -121,7 +117,7 @@ class GraphModel {
         GlobalScope.launch(Dispatchers.IO) {
             val apiPet = loadPetForGraph(baseId)
             graphCreator(apiPet.id!!)
-            graphViewModel.genealogyHead.postValue("Генеалогия питомца " + apiPet.name + ":")
+            graphViewModel.genealogyHead.postValue(apiPet.name)
         }
     }
 
@@ -137,14 +133,10 @@ class GraphModel {
                         continuation.resume(apiPet)
                     } else {
                         Log.d(LOG_TAG,"GraphModel - loadPetForGraph error: " + response.errorBody())
-                        val apiPetError = ApiPet(error = response.errorBody().toString())
-                        continuation.resume(apiPetError)
                     }
                 }
                 catch (e: Exception) {
                     Log.d(LOG_TAG, "GraphModel - loadPetForGraph Exception: $e")
-                    val apiPetError = ApiPet(error = e.toString())
-                    continuation.resume(apiPetError)
                 }
             }
         }
