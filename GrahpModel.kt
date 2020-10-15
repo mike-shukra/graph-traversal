@@ -5,18 +5,18 @@ import androidx.lifecycle.ViewModel
 import de.blox.graphview.Edge
 import de.blox.graphview.Graph
 import de.blox.graphview.Node
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import ru.yogago.petbase.data.ApiPet
 import ru.yogago.petbase.data.MyNode
 import ru.yogago.petbase.service.ApiFactory
 import ru.yogago.petbase.ui.graph.GraphViewModel
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.CoroutineContext
 
-class GraphModel {
+class GraphModel: CoroutineScope {
 
+    private val job = SupervisorJob()
+    override val coroutineContext: CoroutineContext
+        get() = Dispatchers.IO + job
     private val LOG_TAG: String = "myLog"
     private lateinit var graphViewModel: GraphViewModel
     private val service = ApiFactory.API
@@ -26,7 +26,7 @@ class GraphModel {
 
     private suspend fun getAllNodes(id: Long) {
         val apiPet = loadPetForGraph(id)
-        val children: List<Long> = apiPet.children
+        val children: List<Long> = apiPet?.children!!
         val parents = apiPet.parents
         addChildrenNodes(children)
         addParentsNodes(parents)
@@ -39,12 +39,12 @@ class GraphModel {
         if (children.isNotEmpty()) {
             children.forEach {
                 val apiPetChild = loadPetForGraph(it)
-                Log.d(LOG_TAG, "addChildrenNodes: " + apiPetChild.name)
+                Log.d(LOG_TAG, "addChildrenNodes: " + apiPetChild?.name)
                 if (nodes[it] == null) {
                     nodes[it] = MyNode(
                         node = Node(apiPetChild)
                     )
-                    addChildrenNodes(apiPetChild.children)
+                    addChildrenNodes(apiPetChild?.children!!)
                     addParentsNodes(apiPetChild.parents)
                 }
             }
@@ -55,12 +55,12 @@ class GraphModel {
         if (parents.isNotEmpty()) {
             parents.forEach {
                 val apiPetParent = loadPetForGraph(it)
-                Log.d(LOG_TAG, "addChildrenNodes: " + apiPetParent.name)
+                Log.d(LOG_TAG, "addChildrenNodes: " + apiPetParent?.name)
                 if (nodes[it] == null) {
                     nodes[it] = MyNode(
                         node = Node(apiPetParent)
                     )
-                    addParentsNodes(apiPetParent.parents)
+                    addParentsNodes(apiPetParent?.parents!!)
                     addChildrenNodes(apiPetParent.children)
                 }
             }
@@ -68,7 +68,7 @@ class GraphModel {
     }
 
     private fun graphCreator(id: Long) {
-        GlobalScope.launch(Dispatchers.Main) {
+        launch {
             getAllNodes(id)
             edgesChildren()
             edgesParents()
@@ -114,31 +114,28 @@ class GraphModel {
     }
 
     fun loadGraph(baseId: Long) {
-        GlobalScope.launch(Dispatchers.IO) {
+        launch {
             val apiPet = loadPetForGraph(baseId)
-            graphCreator(apiPet.id!!)
+            graphCreator(apiPet?.id!!)
             graphViewModel.genealogyHead.postValue(apiPet.name)
         }
     }
 
-    private suspend fun loadPetForGraph(baseId: Long): ApiPet {
-        return suspendCoroutine { continuation ->
-            GlobalScope.launch(Dispatchers.Main) {
-                val petRequest = service.getPetAsync(baseId.toString())
-                try {
-                    val response = petRequest.await()
-                    if(response.isSuccessful) {
-                        val apiPet = response.body()!!
-                        Log.d(LOG_TAG, "GraphModel - loadPetForGraph: $apiPet")
-                        continuation.resume(apiPet)
-                    } else {
-                        Log.d(LOG_TAG,"GraphModel - loadPetForGraph error: " + response.errorBody())
-                    }
-                }
-                catch (e: Exception) {
-                    Log.d(LOG_TAG, "GraphModel - loadPetForGraph Exception: $e")
-                }
+    private suspend fun loadPetForGraph(baseId: Long): ApiPet? {
+        val petRequest = service.getPetAsync(baseId.toString())
+        return try {
+            val response = petRequest.await()
+            if(response.isSuccessful) {
+                val apiPet = response.body()!!
+                Log.d(LOG_TAG, "GraphModel - loadPetForGraph: $apiPet")
+                apiPet
+            } else {
+                Log.d(LOG_TAG,"GraphModel - loadPetForGraph error: " + response.errorBody())
+                null
             }
+        } catch (e: Exception) {
+            Log.d(LOG_TAG, "GraphModel - loadPetForGraph Exception: $e")
+            null
         }
     }
 
@@ -148,4 +145,3 @@ class GraphModel {
     }
 
 }
-
